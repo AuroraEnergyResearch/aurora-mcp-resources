@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AUS battery investment case — 2h vs 4h, NSW</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#fcfcfb; --card:#ffffff; --border:#e1e0d9; --border-strong:#c3c2b7;
+    --text:#0b0b0b; --text-2:#52514e; --text-mut:#898781;
+    --amber:#F59E00; --charcoal:#3C3C3B; --accent-bg:#fdf1dc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141413; --card:#1a1a19; --border:#2c2c2a; --border-strong:#383835;
+      --text:#ffffff; --text-2:#c3c2b7; --text-mut:#898781;
+      --amber:#F59E00; --charcoal:#c3c2b7; --accent-bg:#3a2c0f;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:1.5rem;}
+  h1{font-size:22px;font-weight:500;margin:0 0 4px;}
+  .sub{font-size:13px;color:var(--text-mut);margin:0 0 1.5rem;}
+  h2{font-size:16px;font-weight:500;margin:0 0 12px;}
+  .card{background:var(--card);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;}
+  .row{display:flex;gap:1.25rem;flex-wrap:wrap;}
+  .row > .card{flex:1;min-width:280px;}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;font-size:12px;color:var(--text-2);}
+  .legend span.sw{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;}
+  .tabbtn{font-size:13px;padding:6px 14px;border:0.5px solid var(--border-strong);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;}
+  .tabbtn.active{background:var(--accent-bg);border-color:var(--amber);color:var(--amber);}
+  .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
+  .metric{background:var(--bg);border-radius:8px;padding:0.75rem 1rem;}
+  .metric .lab{font-size:12px;color:var(--text-mut);margin:0 0 4px;}
+  .metric .val{font-size:20px;font-weight:500;margin:0;}
+  .inputs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 16px;margin-bottom:10px;}
+  .inputs label{font-size:12px;color:var(--text-2);display:block;margin-bottom:3px;}
+  .inputs input{width:100%;height:32px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:6px;padding:0 8px;background:var(--card);color:var(--text);}
+  .case-block{border:0.5px solid var(--border);border-radius:10px;padding:0.75rem 1rem;margin-bottom:0.75rem;}
+  .case-title{font-size:14px;font-weight:500;margin:0 0 8px;}
+  .badge{display:inline-block;background:var(--accent-bg);color:var(--amber);font-size:12px;padding:4px 12px;border-radius:8px;margin-bottom:10px;}
+  .pies{display:flex;gap:1.25rem;}
+  .pie-block{flex:1;text-align:center;}
+  .pie-block p{font-size:13px;color:var(--text-2);margin:6px 0 0;}
+  .toggle-row{display:flex;gap:8px;margin-bottom:10px;}
+  canvas{max-width:100%;}
+</style>
+</head>
+<body>
+
+<h1>AUS battery investment case — duration comparison</h1>
+<p class="sub">NSW &middot; Aurora Central &middot; standalone battery, 2027-entry &middot; figures in real A$2025, per kW of grid connection &middot; illustrative template data, not a live Flexplorer pull</p>
+
+<div class="card">
+  <h2>Cashflow stack by market, A$/kW/year</h2>
+  <div class="toggle-row" id="stackTabs"></div>
+  <div style="position:relative;height:280px;">
+    <canvas id="stackChart" role="img" aria-label="Stacked area chart of annual revenue by market category for the selected battery case"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Total gross margin, A$/kW/year</h2>
+  <div class="legend">
+    <span><span class="sw" style="background:#F59E00"></span>2h NSW, 2027-entry</span>
+    <span><span class="sw" style="background:#3C3C3B"></span>4h NSW, 2027-entry</span>
+  </div>
+  <div style="position:relative;height:260px;">
+    <canvas id="lineChart" role="img" aria-label="Line chart comparing total annual gross margin for the 2 hour and 4 hour battery cases from 2027 to 2056"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Revenue mix: energy revenue vs FCAS (lifetime)</h2>
+  <div class="pies">
+    <div class="pie-block">
+      <div style="position:relative;height:180px;"><canvas id="pie2h" role="img" aria-label="Pie chart of lifetime revenue mix for the 2 hour case"></canvas></div>
+      <p>2h, NSW, 2027-entry</p>
+    </div>
+    <div class="pie-block">
+      <div style="position:relative;height:180px;"><canvas id="pie4h" role="img" aria-label="Pie chart of lifetime revenue mix for the 4 hour case"></canvas></div>
+      <p>4h, NSW, 2027-entry</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Assumptions</h2>
+  <div class="inputs" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
+    <div><label>Discount rate (%, shared, Aurora convention 11% real)</label><input type="number" id="discountRate" step="0.5" placeholder="e.g. 11"></div>
+    <div><label>Asset life (years, shared)</label><input type="number" id="assetLife" step="1" placeholder="e.g. 15"></div>
+  </div>
+  <div class="case-block">
+    <p class="case-title">2h NSW, 2027-entry</p>
+    <div class="inputs">
+      <div><label>Capex (A$/kW)</label><input type="number" id="capex_2h" placeholder="enter your assumption"></div>
+      <div><label>Fixed opex (A$/kW/yr)</label><input type="number" id="opex_2h" placeholder="enter your assumption"></div>
+    </div>
+  </div>
+  <div class="case-block">
+    <p class="case-title">4h NSW, 2027-entry</p>
+    <div class="inputs">
+      <div><label>Capex (A$/kW)</label><input type="number" id="capex_4h" placeholder="enter your assumption"></div>
+      <div><label>Fixed opex (A$/kW/yr)</label><input type="number" id="opex_4h" placeholder="enter your assumption"></div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <p class="case-title">2h NSW — NPV waterfall</p>
+    <div style="position:relative;height:240px;">
+      <canvas id="waterfall2h" role="img" aria-label="Waterfall chart of NPV build up for the 2 hour case"></canvas>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><p class="lab">Unlevered IRR</p><p class="val" id="irr_2h">n/a</p></div>
+      <div class="metric"><p class="lab">Payback</p><p class="val" id="payback_2h">n/a</p></div>
+      <div class="metric"><p class="lab">NPV per kW</p><p class="val" id="npv_2h">n/a</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <p class="case-title">4h NSW — NPV waterfall</p>
+    <div style="position:relative;height:240px;">
+      <canvas id="waterfall4h" role="img" aria-label="Waterfall chart of NPV build up for the 4 hour case"></canvas>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><p class="lab">Unlevered IRR</p><p class="val" id="irr_4h">n/a</p></div>
+      <div class="metric"><p class="lab">Payback</p><p class="val" id="payback_4h">n/a</p></div>
+      <div class="metric"><p class="lab">NPV per kW</p><p class="val" id="npv_4h">n/a</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Ranking</h2>
+  <div class="toggle-row" id="rankToggle">
+    <button class="tabbtn active" data-metric="npv">Sort by NPV</button>
+    <button class="tabbtn" data-metric="irr">Sort by IRR</button>
+  </div>
+  <div id="rankBadge" class="badge">Enter capex to see the recommendation</div>
+  <div style="position:relative;height:160px;">
+    <canvas id="rankChart" role="img" aria-label="Horizontal bar chart ranking the two battery cases by NPV or IRR"></canvas>
+  </div>
+</div>
+
+<script>
+const CASES = {"2h": {"label": "2h NSW, 2027-entry", "state": "NSW", "durationHours": 2, "cyclesPerDay": 1.5, "entryYear": 2027, "yearly": [{"year": 2027, "energyRevenue": 38.55, "regulationFcas": 3.16, "contingencyFcas": 5.63}, {"year": 2028, "energyRevenue": 38.91, "regulationFcas": 3.16, "contingencyFcas": 5.6}, {"year": 2029, "energyRevenue": 39.27, "regulationFcas": 3.16, "contingencyFcas": 5.5}, {"year": 2030, "energyRevenue": 39.93, "regulationFcas": 3.11, "contingencyFcas": 5.41}, {"year": 2031, "energyRevenue": 40.58, "regulationFcas": 3.15, "contingencyFcas": 5.33}, {"year": 2032, "energyRevenue": 41.09, "regulationFcas": 3.16, "contingencyFcas": 5.42}, {"year": 2033, "energyRevenue": 41.89, "regulationFcas": 3.15, "contingencyFcas": 5.53}, {"year": 2034, "energyRevenue": 42.27, "regulationFcas": 3.2, "contingencyFcas": 5.48}, {"year": 2035, "energyRevenue": 42.73, "regulationFcas": 3.15, "contingencyFcas": 5.44}, {"year": 2036, "energyRevenue": 43.77, "regulationFcas": 3.11, "contingencyFcas": 5.46}, {"year": 2037, "energyRevenue": 44.68, "regulationFcas": 3.09, "contingencyFcas": 5.47}, {"year": 2038, "energyRevenue": 45.09, "regulationFcas": 3.04, "contingencyFcas": 5.4}, {"year": 2039, "energyRevenue": 46.06, "regulationFcas": 3.03, "contingencyFcas": 5.36}, {"year": 2040, "energyRevenue": 46.97, "regulationFcas": 3.02, "contingencyFcas": 5.32}, {"year": 2041, "energyRevenue": 48.09, "regulationFcas": 3.05, "contingencyFcas": 5.26}, {"year": 2042, "energyRevenue": 49.03, "regulationFcas": 3.05, "contingencyFcas": 5.34}, {"year": 2043, "energyRevenue": 50.14, "regulationFcas": 3.02, "contingencyFcas": 5.45}, {"year": 2044, "energyRevenue": 50.66, "regulationFcas": 3.01, "contingencyFcas": 5.5}, {"year": 2045, "energyRevenue": 51.22, "regulationFcas": 3.01, "contingencyFcas": 5.4}, {"year": 2046, "energyRevenue": 52.31, "regulationFcas": 3.04, "contingencyFcas": 5.42}, {"year": 2047, "energyRevenue": 53.65, "regulationFcas": 3.02, "contingencyFcas": 5.46}, {"year": 2048, "energyRevenue": 54.71, "regulationFcas": 3.03, "contingencyFcas": 5.45}, {"year": 2049, "energyRevenue": 56.07, "regulationFcas": 3.08, "contingencyFcas": 5.44}, {"year": 2050, "energyRevenue": 57.26, "regulationFcas": 3.03, "contingencyFcas": 5.49}, {"year": 2051, "energyRevenue": 58.46, "regulationFcas": 3.09, "contingencyFcas": 5.56}, {"year": 2052, "energyRevenue": 59.26, "regulationFcas": 3.08, "contingencyFcas": 5.6}, {"year": 2053, "energyRevenue": 59.76, "regulationFcas": 3.07, "contingencyFcas": 5.52}, {"year": 2054, "energyRevenue": 60.38, "regulationFcas": 3.02, "contingencyFcas": 5.58}, {"year": 2055, "energyRevenue": 61.02, "regulationFcas": 2.99, "contingencyFcas": 5.56}, {"year": 2056, "energyRevenue": 62.57, "regulationFcas": 2.94, "contingencyFcas": 5.55}]}, "4h": {"label": "4h NSW, 2027-entry", "state": "NSW", "durationHours": 4, "cyclesPerDay": 1.0, "entryYear": 2027, "yearly": [{"year": 2027, "energyRevenue": 59.22, "regulationFcas": 4.16, "contingencyFcas": 8.0}, {"year": 2028, "energyRevenue": 60.83, "regulationFcas": 4.13, "contingencyFcas": 7.97}, {"year": 2029, "energyRevenue": 61.88, "regulationFcas": 4.19, "contingencyFcas": 8.12}, {"year": 2030, "energyRevenue": 62.68, "regulationFcas": 4.14, "contingencyFcas": 8.03}, {"year": 2031, "energyRevenue": 63.6, "regulationFcas": 4.13, "contingencyFcas": 8.06}, {"year": 2032, "energyRevenue": 64.57, "regulationFcas": 4.05, "contingencyFcas": 8.04}, {"year": 2033, "energyRevenue": 65.7, "regulationFcas": 4.06, "contingencyFcas": 8.18}, {"year": 2034, "energyRevenue": 67.26, "regulationFcas": 4.06, "contingencyFcas": 8.22}, {"year": 2035, "energyRevenue": 68.84, "regulationFcas": 3.99, "contingencyFcas": 8.35}, {"year": 2036, "energyRevenue": 70.6, "regulationFcas": 4.05, "contingencyFcas": 8.45}, {"year": 2037, "energyRevenue": 71.86, "regulationFcas": 4.03, "contingencyFcas": 8.32}, {"year": 2038, "energyRevenue": 73.49, "regulationFcas": 3.96, "contingencyFcas": 8.17}, {"year": 2039, "energyRevenue": 74.54, "regulationFcas": 3.91, "contingencyFcas": 8.12}, {"year": 2040, "energyRevenue": 75.36, "regulationFcas": 3.83, "contingencyFcas": 8.01}, {"year": 2041, "energyRevenue": 76.27, "regulationFcas": 3.81, "contingencyFcas": 7.85}, {"year": 2042, "energyRevenue": 78.36, "regulationFcas": 3.83, "contingencyFcas": 7.74}, {"year": 2043, "energyRevenue": 79.54, "regulationFcas": 3.81, "contingencyFcas": 7.7}, {"year": 2044, "energyRevenue": 80.53, "regulationFcas": 3.86, "contingencyFcas": 7.85}, {"year": 2045, "energyRevenue": 82.09, "regulationFcas": 3.86, "contingencyFcas": 7.72}, {"year": 2046, "energyRevenue": 83.08, "regulationFcas": 3.83, "contingencyFcas": 7.65}, {"year": 2047, "energyRevenue": 85.29, "regulationFcas": 3.78, "contingencyFcas": 7.51}, {"year": 2048, "energyRevenue": 87.76, "regulationFcas": 3.78, "contingencyFcas": 7.4}, {"year": 2049, "energyRevenue": 89.59, "regulationFcas": 3.71, "contingencyFcas": 7.41}, {"year": 2050, "energyRevenue": 92.24, "regulationFcas": 3.77, "contingencyFcas": 7.47}, {"year": 2051, "energyRevenue": 93.64, "regulationFcas": 3.75, "contingencyFcas": 7.37}, {"year": 2052, "energyRevenue": 96.03, "regulationFcas": 3.75, "contingencyFcas": 7.45}, {"year": 2053, "energyRevenue": 97.62, "regulationFcas": 3.71, "contingencyFcas": 7.54}, {"year": 2054, "energyRevenue": 100.52, "regulationFcas": 3.76, "contingencyFcas": 7.63}, {"year": 2055, "energyRevenue": 103.17, "regulationFcas": 3.8, "contingencyFcas": 7.55}, {"year": 2056, "energyRevenue": 105.27, "regulationFcas": 3.78, "contingencyFcas": 7.41}]}};
+
+const CATS = ["energyRevenue","regulationFcas","contingencyFcas"];
+const CAT_LABELS = {energyRevenue:"Energy revenue", regulationFcas:"Regulation FCAS", contingencyFcas:"Contingency FCAS"};
+const COLORS = {energyRevenue:"#F59E00", regulationFcas:"#3C3C3B", contingencyFcas:"#838383"};
+const CASE_COLORS = {"2h":"#F59E00","4h":"#3C3C3B"};
+
+function fmtAUD(v){ if(v===null||v===undefined||isNaN(v)) return "n/a"; return (v<0?"-A$":"A$") + Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0}); }
+
+function totalForYear(y){ return CATS.reduce((s,c)=>s+y[c],0); }
+
+// ---- Cashflow stack chart with tabs ----
+let currentCase = "2h";
+const stackTabs = document.getElementById('stackTabs');
+Object.keys(CASES).forEach(k=>{
+  const b = document.createElement('button');
+  b.className = 'tabbtn' + (k===currentCase?' active':'');
+  b.textContent = CASES[k].label;
+  b.dataset.case = k;
+  b.onclick = ()=>{ currentCase = k; renderStack(); [...stackTabs.children].forEach(c=>c.classList.toggle('active', c===b)); };
+  stackTabs.appendChild(b);
+});
+
+let stackChart;
+function renderStack(){
+  const c = CASES[currentCase];
+  const years = c.yearly.map(y=>y.year);
+  const datasets = CATS.map(cat=>({
+    label: CAT_LABELS[cat],
+    data: c.yearly.map(y=>y[cat]),
+    backgroundColor: COLORS[cat] + '33',
+    borderColor: COLORS[cat],
+    borderWidth: 1.5,
+    fill: true,
+    pointRadius: 0,
+    tension: 0.15
+  }));
+  if(stackChart) stackChart.destroy();
+  stackChart = new Chart(document.getElementById('stackChart'), {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ stacked:true, ticks:{ callback:v=>'A$'+v } }, x:{ ticks:{ maxTicksLimit:10 } } },
+      plugins:{ legend:{ display:false } },
+      interaction:{ mode:'index', intersect:false }
+    }
+  });
+}
+renderStack();
+
+// custom legend for stack chart categories
+const stackLegendDiv = document.createElement('div');
+stackLegendDiv.className = 'legend';
+stackLegendDiv.innerHTML = CATS.map(c=>`<span><span class="sw" style="background:${COLORS[c]}"></span>${CAT_LABELS[c]}</span>`).join('');
+document.getElementById('stackChart').closest('.card').insertBefore(stackLegendDiv, document.getElementById('stackTabs'));
+
+// ---- Cross comparison line chart ----
+new Chart(document.getElementById('lineChart'), {
+  type:'line',
+  data:{
+    labels: CASES["2h"].yearly.map(y=>y.year),
+    datasets: Object.keys(CASES).map(k=>({
+      label: CASES[k].label,
+      data: CASES[k].yearly.map(y=>totalForYear(y)),
+      borderColor: CASE_COLORS[k],
+      backgroundColor: CASE_COLORS[k],
+      pointRadius:0, borderWidth:2, tension:0.15
+    }))
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{ y:{ ticks:{ callback:v=>'A$'+v } }, x:{ ticks:{ maxTicksLimit:10 } } },
+    interaction:{ mode:'index', intersect:false }
+  }
+});
+
+// ---- Revenue mix pies ----
+function lifetimeMix(k){
+  const c = CASES[k];
+  let energy=0, fcas=0;
+  c.yearly.forEach(y=>{ energy += y.energyRevenue; fcas += y.regulationFcas + y.contingencyFcas; });
+  return { energy, fcas };
+}
+["2h","4h"].forEach(k=>{
+  const mix = lifetimeMix(k);
+  new Chart(document.getElementById('pie'+k), {
+    type:'pie',
+    data:{
+      labels:['Energy revenue','FCAS (reg + contingency)'],
+      datasets:[{ data:[mix.energy, mix.fcas], backgroundColor:['#F59E00','#838383'] }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => {
+        const total = mix.energy+mix.fcas;
+        return ctx.label + ': ' + Math.round(100*ctx.raw/total) + '%';
+      } } } }
+    }
+  });
+});
+
+// ---- Finance formulas ----
+function npv(rate, cashflows){
+  return cashflows.reduce((acc, cf, t)=> acc + cf/Math.pow(1+rate, t), 0);
+}
+function irr(cashflows, guess=0.1){
+  let rate = guess;
+  for(let i=0;i<100;i++){
+    const npvVal = npv(rate, cashflows);
+    const d = 1e-6;
+    const deriv = (npv(rate+d, cashflows) - npvVal)/d;
+    if(Math.abs(deriv) < 1e-9) break;
+    const next = rate - npvVal/deriv;
+    if(Math.abs(next-rate) < 1e-7) return next;
+    rate = next;
+  }
+  if(!isFinite(rate) || rate < -0.99 || rate > 5){
+    let lo=-0.5, hi=2;
+    for(let i=0;i<200;i++){
+      const mid=(lo+hi)/2;
+      if(npv(lo,cashflows)*npv(mid,cashflows) <= 0) hi=mid; else lo=mid;
+    }
+    return (lo+hi)/2;
+  }
+  return rate;
+}
+function paybackYears(cashflows){
+  let cumulative = cashflows[0];
+  if(cumulative >= 0) return 0;
+  for(let t=1;t<cashflows.length;t++){
+    cumulative += cashflows[t];
+    if(cumulative >= 0){
+      const prev = cumulative - cashflows[t];
+      const frac = -prev/cashflows[t];
+      return t-1+frac;
+    }
+  }
+  return null;
+}
+
+function buildCashflows(caseKey, capex, opex, life){
+  const c = CASES[caseKey];
+  const n = life && life>0 ? Math.min(life, c.yearly.length) : c.yearly.length;
+  const cfs = [ -capex ];
+  for(let i=0;i<n;i++){
+    const rev = totalForYear(c.yearly[i]);
+    cfs.push(rev - opex);
+  }
+  return cfs;
+}
+
+let waterfallCharts = {};
+function computeAndRender(){
+  const rate = parseFloat(document.getElementById('discountRate').value);
+  const life = parseFloat(document.getElementById('assetLife').value);
+  const results = {};
+
+  ["2h","4h"].forEach(k=>{
+    const capex = parseFloat(document.getElementById('capex_'+k).value);
+    const opex = parseFloat(document.getElementById('opex_'+k).value);
+    const hasCapex = !isNaN(capex) && capex > 0;
+    const opexVal = isNaN(opex) ? 0 : opex;
+    const rateVal = isNaN(rate) ? 0.11 : rate/100;
+
+    let npvVal=null, irrVal=null, paybackVal=null;
+    let erSum=0, rfSum=0, cfSum=0;
+
+    if(hasCapex){
+      const cfs = buildCashflows(k, capex, opexVal, life);
+      npvVal = npv(rateVal, cfs);
+      irrVal = irr(cfs);
+      paybackVal = paybackYears(cfs);
+
+      const c = CASES[k];
+      const n = life && life>0 ? Math.min(life, c.yearly.length) : c.yearly.length;
+      for(let i=0;i<n;i++){
+        erSum += c.yearly[i].energyRevenue;
+        rfSum += c.yearly[i].regulationFcas;
+        cfSum += c.yearly[i].contingencyFcas;
+      }
+    }
+    results[k] = {npvVal, irrVal, paybackVal, capex, opex: opexVal, hasCapex, erSum, rfSum, cfSum, life};
+
+    document.getElementById('npv_'+k).textContent = hasCapex ? fmtAUD(npvVal) : 'n/a';
+    document.getElementById('irr_'+k).textContent = hasCapex && irrVal!==null && isFinite(irrVal) ? (irrVal*100).toFixed(1)+'%' : 'n/a';
+    document.getElementById('payback_'+k).textContent = hasCapex && paybackVal!==null ? paybackVal.toFixed(1)+' yrs' : 'n/a';
+
+    // waterfall
+    const n = life && life>0 ? Math.min(life, CASES[k].yearly.length) : CASES[k].yearly.length;
+    const opexLifetime = hasCapex ? -(opexVal * n) : 0;
+    const steps = hasCapex ? [
+      {label:'Capex', value: -capex},
+      {label:'Fixed opex', value: opexLifetime},
+      {label:'Energy revenue', value: results[k].erSum},
+      {label:'Regulation FCAS', value: results[k].rfSum},
+      {label:'Contingency FCAS', value: results[k].cfSum}
+    ] : [
+      {label:'Capex', value:0},{label:'Fixed opex', value:0},{label:'Energy revenue', value:0},
+      {label:'Regulation FCAS', value:0},{label:'Contingency FCAS', value:0}
+    ];
+    let running = 0;
+    const bases = [], bars = [], colors = [];
+    steps.forEach(s=>{
+      const start = running;
+      running += s.value;
+      bases.push(Math.min(start, running));
+      bars.push(Math.abs(s.value));
+      colors.push(s.value >= 0 ? '#F59E00' : '#838383');
+    });
+    // final NPV-ish bar (undiscounted net, for visual close-out) -- use running total as "Net"
+    const labels = steps.map(s=>s.label).concat(['Net']);
+    bases.push(0);
+    bars.push(Math.abs(running));
+    colors.push('#3C3C3B');
+
+    const ctxId = 'waterfall'+k;
+    if(waterfallCharts[k]) waterfallCharts[k].destroy();
+    waterfallCharts[k] = new Chart(document.getElementById(ctxId), {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          { label:'base', data: bases, backgroundColor:'rgba(0,0,0,0)', stack:'s' },
+          { label:'value', data: bars, backgroundColor: colors, stack:'s', borderRadius:4 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ctx.datasetIndex===1 ? fmtAUD(steps[ctx.dataIndex] ? steps[ctx.dataIndex].value : running) : '' } } },
+        scales:{ x:{ ticks:{ autoSkip:false, maxRotation:45 } }, y:{ ticks:{ callback:v=>'A$'+v } } }
+      }
+    });
+  });
+
+  renderRanking(results);
+}
+
+let rankChart;
+let rankMetric = 'npv';
+function renderRanking(results){
+  const entries = Object.keys(results).map(k=>({
+    key:k, label:CASES[k].label,
+    npv: results[k].npvVal, irr: results[k].irrVal, hasCapex: results[k].hasCapex
+  }));
+  const valid = entries.filter(e=>e.hasCapex);
+  const badge = document.getElementById('rankBadge');
+  if(valid.length===0){
+    badge.textContent = 'Enter capex for at least one case to see the recommendation';
+  } else {
+    const metricKey = rankMetric;
+    const sorted = [...valid].sort((a,b)=> (b[metricKey]??-Infinity) - (a[metricKey]??-Infinity));
+    const top = sorted[0];
+    const topVal = top[metricKey];
+    const jointBest = sorted.filter(e => Math.abs((e[metricKey]-topVal)/ (topVal||1)) <= 0.01);
+    if(jointBest.length > 1){
+      badge.textContent = 'Joint best (' + rankMetric.toUpperCase() + '): ' + jointBest.map(j=>j.label).join(' & ');
+    } else {
+      const valStr = rankMetric==='npv' ? fmtAUD(topVal)+'/kW' : (topVal*100).toFixed(1)+'%';
+      badge.textContent = 'Highest ' + rankMetric.toUpperCase() + ': ' + top.label + ' — ' + valStr;
+    }
+  }
+
+  const sortedAll = [...entries].sort((a,b)=> ((b[rankMetric]??-Infinity)) - ((a[rankMetric]??-Infinity)));
+  const data = sortedAll.map(e=> e[rankMetric]===null||e[rankMetric]===undefined||!e.hasCapex ? 0 : (rankMetric==='irr' ? e[rankMetric]*100 : e[rankMetric]));
+  const labels = sortedAll.map(e=>e.label);
+  const colors = sortedAll.map((e,i)=> i===0 && e.hasCapex ? '#F59E00' : '#B1B1B0');
+
+  if(rankChart) rankChart.destroy();
+  rankChart = new Chart(document.getElementById('rankChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ ticks:{ callback: v => rankMetric==='irr' ? v+'%' : 'A$'+v } } }
+    }
+  });
+}
+
+document.querySelectorAll('#rankToggle .tabbtn').forEach(b=>{
+  b.onclick = ()=>{
+    rankMetric = b.dataset.metric;
+    document.querySelectorAll('#rankToggle .tabbtn').forEach(x=>x.classList.toggle('active', x===b));
+    computeAndRender();
+  };
+});
+
+['discountRate','assetLife','capex_2h','opex_2h','capex_4h','opex_4h'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', computeAndRender);
+});
+
+computeAndRender();
+</script>
+</body>
+</html>
