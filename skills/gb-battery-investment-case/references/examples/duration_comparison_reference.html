@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GB battery investment case — 1h vs 2h, South England & Wales</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#fcfcfb; --card:#ffffff; --border:#e1e0d9; --border-strong:#c3c2b7;
+    --text:#0b0b0b; --text-2:#52514e; --text-mut:#898781;
+    --amber:#F59E00; --charcoal:#3C3C3B; --accent-bg:#fdf1dc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141413; --card:#1a1a19; --border:#2c2c2a; --border-strong:#383835;
+      --text:#ffffff; --text-2:#c3c2b7; --text-mut:#898781;
+      --amber:#F59E00; --charcoal:#c3c2b7; --accent-bg:#3a2c0f;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:1.5rem;}
+  h1{font-size:22px;font-weight:500;margin:0 0 4px;}
+  .sub{font-size:13px;color:var(--text-mut);margin:0 0 1.5rem;}
+  h2{font-size:16px;font-weight:500;margin:0 0 12px;}
+  .card{background:var(--card);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;}
+  .row{display:flex;gap:1.25rem;flex-wrap:wrap;}
+  .row > .card{flex:1;min-width:280px;}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;font-size:12px;color:var(--text-2);}
+  .legend span.sw{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;}
+  .tabbtn{font-size:13px;padding:6px 14px;border:0.5px solid var(--border-strong);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;}
+  .tabbtn.active{background:var(--accent-bg);border-color:var(--amber);color:var(--amber);}
+  .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
+  .metric{background:var(--bg);border-radius:8px;padding:0.75rem 1rem;}
+  .metric .lab{font-size:12px;color:var(--text-mut);margin:0 0 4px;}
+  .metric .val{font-size:20px;font-weight:500;margin:0;}
+  .inputs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 16px;margin-bottom:10px;}
+  .inputs label{font-size:12px;color:var(--text-2);display:block;margin-bottom:3px;}
+  .inputs input{width:100%;height:32px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:6px;padding:0 8px;background:var(--card);color:var(--text);}
+  .case-block{border:0.5px solid var(--border);border-radius:10px;padding:0.75rem 1rem;margin-bottom:0.75rem;}
+  .case-title{font-size:14px;font-weight:500;margin:0 0 8px;}
+  .badge{display:inline-block;background:var(--accent-bg);color:var(--amber);font-size:12px;padding:4px 12px;border-radius:8px;margin-bottom:10px;}
+  .pies{display:flex;gap:1.25rem;}
+  .pie-block{flex:1;text-align:center;}
+  .pie-block p{font-size:13px;color:var(--text-2);margin:6px 0 0;}
+  .toggle-row{display:flex;gap:8px;margin-bottom:10px;}
+  canvas{max-width:100%;}
+</style>
+</head>
+<body>
+
+<h1>GB battery investment case — duration comparison</h1>
+<p class="sub">South England & Wales &middot; Great Britain Q2 26 (Central) &middot; standalone battery, 2026 vintage, undegraded &middot; 2 cycles/day &middot; figures in real GBP 2025, per kW of grid connection</p>
+
+<div class="card">
+  <h2>Cashflow stack by market, £/kW/year</h2>
+  <div class="toggle-row" id="stackTabs"></div>
+  <div style="position:relative;height:280px;">
+    <canvas id="stackChart" role="img" aria-label="Stacked area chart of annual revenue by market category for the selected battery case"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Total gross margin, £/kW/year</h2>
+  <div class="legend">
+    <span><span class="sw" style="background:#F59E00"></span>1h standalone</span>
+    <span><span class="sw" style="background:#3C3C3B"></span>2h standalone</span>
+  </div>
+  <div style="position:relative;height:260px;">
+    <canvas id="lineChart" role="img" aria-label="Line chart comparing total annual gross margin for the 1 hour and 2 hour battery cases from 2026 to 2060"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Revenue mix: energy trading vs everything else (lifetime)</h2>
+  <div class="pies">
+    <div class="pie-block">
+      <div style="position:relative;height:180px;"><canvas id="pie1h" role="img" aria-label="Pie chart of lifetime revenue mix for the 1 hour case"></canvas></div>
+      <p>1h, 2cy</p>
+    </div>
+    <div class="pie-block">
+      <div style="position:relative;height:180px;"><canvas id="pie2h" role="img" aria-label="Pie chart of lifetime revenue mix for the 2 hour case"></canvas></div>
+      <p>2h, 2cy</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Assumptions</h2>
+  <div class="inputs" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
+    <div><label>Discount rate (%, shared)</label><input type="number" id="discountRate" step="0.5" placeholder="e.g. 8"></div>
+    <div><label>Asset life (years, shared)</label><input type="number" id="assetLife" step="1" placeholder="e.g. 15"></div>
+  </div>
+  <div class="case-block">
+    <p class="case-title">1h standalone</p>
+    <div class="inputs">
+      <div><label>Capex (£/kW)</label><input type="number" id="capex_1h" placeholder="enter your assumption"></div>
+      <div><label>Fixed opex (£/kW/yr)</label><input type="number" id="opex_1h" placeholder="enter your assumption"></div>
+    </div>
+  </div>
+  <div class="case-block">
+    <p class="case-title">2h standalone</p>
+    <div class="inputs">
+      <div><label>Capex (£/kW)</label><input type="number" id="capex_2h" placeholder="enter your assumption"></div>
+      <div><label>Fixed opex (£/kW/yr)</label><input type="number" id="opex_2h" placeholder="enter your assumption"></div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <p class="case-title">1h standalone — NPV waterfall</p>
+    <div style="position:relative;height:240px;">
+      <canvas id="waterfall1h" role="img" aria-label="Waterfall chart of NPV build up for the 1 hour case"></canvas>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><p class="lab">Unlevered IRR</p><p class="val" id="irr_1h">n/a</p></div>
+      <div class="metric"><p class="lab">Payback</p><p class="val" id="payback_1h">n/a</p></div>
+      <div class="metric"><p class="lab">NPV per kW</p><p class="val" id="npv_1h">n/a</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <p class="case-title">2h standalone — NPV waterfall</p>
+    <div style="position:relative;height:240px;">
+      <canvas id="waterfall2h" role="img" aria-label="Waterfall chart of NPV build up for the 2 hour case"></canvas>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><p class="lab">Unlevered IRR</p><p class="val" id="irr_2h">n/a</p></div>
+      <div class="metric"><p class="lab">Payback</p><p class="val" id="payback_2h">n/a</p></div>
+      <div class="metric"><p class="lab">NPV per kW</p><p class="val" id="npv_2h">n/a</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Ranking</h2>
+  <div class="toggle-row" id="rankToggle">
+    <button class="tabbtn active" data-metric="npv">Sort by NPV</button>
+    <button class="tabbtn" data-metric="irr">Sort by IRR</button>
+  </div>
+  <div id="rankBadge" class="badge">Enter capex to see the recommendation</div>
+  <div style="position:relative;height:160px;">
+    <canvas id="rankChart" role="img" aria-label="Horizontal bar chart ranking the two battery cases by NPV or IRR"></canvas>
+  </div>
+</div>
+
+<script>
+const CASES = {"1h":{"label":"1h Standalone","region":"South England & Wales","durationHours":1,"cyclesPerDay":2,"yearly":[{"year":2026,"energyTrading":30.795772014262155,"frequencyResponse":4.077445459166112,"capacityMarket":2.43319013928648,"networkCharges":-3.8436630199775474},{"year":2027,"energyTrading":55.02005135192063,"frequencyResponse":9.509483524647777,"capacityMarket":8.042589181963809,"networkCharges":0.43412797284024407},{"year":2028,"energyTrading":56.56317886800257,"frequencyResponse":9.446642091899617,"capacityMarket":5.831052512323316,"networkCharges":-0.6636551917430928},{"year":2029,"energyTrading":63.08676052318477,"frequencyResponse":11.173762786370666,"capacityMarket":5.634962198957354,"networkCharges":1.8081078296844844},{"year":2030,"energyTrading":66.15714071857201,"frequencyResponse":11.412829763470173,"capacityMarket":3.216776751650931,"networkCharges":2.2301917251574217},{"year":2031,"energyTrading":66.81952252768596,"frequencyResponse":12.233546090996022,"capacityMarket":3.3733285343820327,"networkCharges":2.268149139027763},{"year":2032,"energyTrading":67.2151837336042,"frequencyResponse":12.630650463893959,"capacityMarket":4.052179425499553,"networkCharges":2.2318258995314855},{"year":2033,"energyTrading":65.94491028038166,"frequencyResponse":12.575831341709396,"capacityMarket":5.916920947615126,"networkCharges":2.256699306887395},{"year":2034,"energyTrading":65.91019999221564,"frequencyResponse":12.80131557076472,"capacityMarket":5.895432615748355,"networkCharges":2.2390205113861397},{"year":2035,"energyTrading":65.45393638467218,"frequencyResponse":12.216864778554264,"capacityMarket":5.773877632274839,"networkCharges":2.2364525230840364},{"year":2036,"energyTrading":66.08833561051071,"frequencyResponse":11.915179210666697,"capacityMarket":5.630908597587919,"networkCharges":2.2241219346251766},{"year":2037,"energyTrading":67.3816679008426,"frequencyResponse":11.393198447937566,"capacityMarket":4.186362120045393,"networkCharges":2.255595708608805},{"year":2038,"energyTrading":66.8522272382111,"frequencyResponse":11.425552978239681,"capacityMarket":0.6934947913526534,"networkCharges":2.2410579235927672},{"year":2039,"energyTrading":66.055110935412,"frequencyResponse":11.646580368093009,"capacityMarket":2.3642046353527117,"networkCharges":2.226085066178438},{"year":2040,"energyTrading":64.65311666072664,"frequencyResponse":11.389049342870944,"capacityMarket":4.0525720518102055,"networkCharges":2.205615440414979},{"year":2041,"energyTrading":65.24170594648183,"frequencyResponse":11.565794851795857,"capacityMarket":0.7301257649843054,"networkCharges":2.222880386561765},{"year":2042,"energyTrading":65.03815573321346,"frequencyResponse":11.402228853082566,"capacityMarket":2.0241584157622445,"networkCharges":2.230764747340536},{"year":2043,"energyTrading":65.09900219984266,"frequencyResponse":10.861624869402231,"capacityMarket":5.478537754489167,"networkCharges":2.227262945110395},{"year":2044,"energyTrading":65.80097559720099,"frequencyResponse":10.751487883503355,"capacityMarket":5.3783755991852376,"networkCharges":2.2004794638107725},{"year":2045,"energyTrading":66.10657681667317,"frequencyResponse":10.70127416182752,"capacityMarket":5.32716439444991,"networkCharges":2.2101465602703447},{"year":2046,"energyTrading":67.46446960630256,"frequencyResponse":10.543544500164463,"capacityMarket":5.2735019281534825,"networkCharges":2.2220526878528224},{"year":2047,"energyTrading":69.46051810052651,"frequencyResponse":10.549020045469772,"capacityMarket":5.259165762053725,"networkCharges":2.2130647287954615},{"year":2048,"energyTrading":69.61711232934526,"frequencyResponse":10.651697131466259,"capacityMarket":5.232329223144557,"networkCharges":2.1985906129108788},{"year":2049,"energyTrading":69.62819075821878,"frequencyResponse":10.673196074854939,"capacityMarket":5.160287600900848,"networkCharges":2.233470685427462},{"year":2050,"energyTrading":70.2964513504706,"frequencyResponse":10.621231452064036,"capacityMarket":5.160287600900848,"networkCharges":2.2407501894573905},{"year":2051,"energyTrading":71.17981810335024,"frequencyResponse":10.693793038881312,"capacityMarket":5.165657030987063,"networkCharges":2.2200471102119232},{"year":2052,"energyTrading":71.17841738245819,"frequencyResponse":10.65626008588735,"capacityMarket":5.180078089262097,"networkCharges":2.185570275527901},{"year":2053,"energyTrading":70.55733561661609,"frequencyResponse":10.52356300440884,"capacityMarket":5.180078089262097,"networkCharges":2.255203082298153},{"year":2054,"energyTrading":71.19452567271684,"frequencyResponse":10.810657729670819,"capacityMarket":3.999620557481716,"networkCharges":2.226254850528991},{"year":2055,"energyTrading":70.62215079243943,"frequencyResponse":11.911921473440476,"capacityMarket":0.8297891787584875,"networkCharges":2.229491364711394},{"year":2056,"energyTrading":70.65339111294104,"frequencyResponse":11.298671010767592,"capacityMarket":0.8297891787584875,"networkCharges":2.196128739827871},{"year":2057,"energyTrading":70.55588183811446,"frequencyResponse":9.851450429703865,"capacityMarket":0.8518823673741014,"networkCharges":2.212703937050538},{"year":2058,"energyTrading":69.82139473762535,"frequencyResponse":9.69387994086945,"capacityMarket":0.91121138637021,"networkCharges":2.2212037661000608},{"year":2059,"energyTrading":70.63557436765494,"frequencyResponse":8.766613321850143,"capacityMarket":0.91121138637021,"networkCharges":2.2304888477708884},{"year":2060,"energyTrading":69.13740786990364,"frequencyResponse":9.806287792456963,"capacityMarket":0.6639523143565583,"networkCharges":7.225480771887194}]},"2h":{"label":"2h Standalone","region":"South England & Wales","durationHours":2,"cyclesPerDay":2,"yearly":[{"year":2026,"energyTrading":43.15593478468254,"frequencyResponse":0.7683484669023848,"capacityMarket":4.868438913823407,"networkCharges":-3.8113721588068876},{"year":2027,"energyTrading":78.03565712104137,"frequencyResponse":2.0475037639631815,"capacityMarket":16.073166121126043,"networkCharges":0.45976540977363634},{"year":2028,"energyTrading":81.5761914061516,"frequencyResponse":2.133786048609463,"capacityMarket":11.614989867368376,"networkCharges":-0.630483574253943},{"year":2029,"energyTrading":91.70099464024463,"frequencyResponse":2.6680018961002685,"capacityMarket":11.2699137863928,"networkCharges":1.8032477526499253},{"year":2030,"energyTrading":97.54210687533816,"frequencyResponse":3.3117604842630164,"capacityMarket":6.433553503301862,"networkCharges":2.2315924460494783},{"year":2031,"energyTrading":99.85399670767696,"frequencyResponse":4.246656787535268,"capacityMarket":6.7466570687640655,"networkCharges":2.2384687122468447},{"year":2032,"energyTrading":99.91000432031538,"frequencyResponse":4.298112057274515,"capacityMarket":8.104358850999105,"networkCharges":2.235529320677907},{"year":2033,"energyTrading":101.00203604002377,"frequencyResponse":4.6407156536451755,"capacityMarket":11.833841895230252,"networkCharges":2.2538660305375533},{"year":2034,"energyTrading":101.63236044144907,"frequencyResponse":4.961300342053588,"capacityMarket":11.790875843018618,"networkCharges":2.2285151046957177},{"year":2035,"energyTrading":100.70689778115438,"frequencyResponse":4.747276556660543,"capacityMarket":11.54775526454968,"networkCharges":2.22934280340466},{"year":2036,"energyTrading":102.48973957717232,"frequencyResponse":4.6697593891115226,"capacityMarket":11.261827806697749,"networkCharges":2.2080454789322586},{"year":2037,"energyTrading":104.29838859447418,"frequencyResponse":4.392809278795043,"capacityMarket":8.372734851612696,"networkCharges":2.283514622752744},{"year":2038,"energyTrading":103.23146373560371,"frequencyResponse":4.556311608376879,"capacityMarket":1.387000194227216,"networkCharges":2.2677246781513825},{"year":2039,"energyTrading":102.33448240011418,"frequencyResponse":4.631992982635552,"capacityMarket":4.728409270705423,"networkCharges":2.2410579235927672},{"year":2040,"energyTrading":101.4535350742299,"frequencyResponse":4.652218543395091,"capacityMarket":8.10515471514232,"networkCharges":2.2193467497658936},{"year":2041,"energyTrading":101.7728888260968,"frequencyResponse":4.927035737807758,"capacityMarket":1.4602515299686107,"networkCharges":2.213011671185914},{"year":2042,"energyTrading":101.4013582210008,"frequencyResponse":4.672486550242269,"capacityMarket":4.048327443046398,"networkCharges":2.2146458455599793},{"year":2043,"energyTrading":102.04164684149914,"frequencyResponse":4.7994534098896375,"capacityMarket":10.957064897456425,"networkCharges":2.246300015416068},{"year":2044,"energyTrading":102.59342475775024,"frequencyResponse":4.55100584742212,"capacityMarket":10.756761809892383,"networkCharges":2.2115578926843087},{"year":2045,"energyTrading":104.47050747984653,"frequencyResponse":4.8190210562907865,"capacityMarket":10.65431817737791,"networkCharges":2.2074406221834177},{"year":2046,"energyTrading":106.10615685545756,"frequencyResponse":4.613008969939427,"capacityMarket":10.547014467828877,"networkCharges":2.2086715587249213},{"year":2047,"energyTrading":108.51677628764249,"frequencyResponse":4.664124670977569,"capacityMarket":10.51833152410745,"networkCharges":2.185973513360465},{"year":2048,"energyTrading":109.53898419318627,"frequencyResponse":4.701551508752435,"capacityMarket":10.464669057811026,"networkCharges":2.20076597490233},{"year":2049,"energyTrading":110.12581196630444,"frequencyResponse":4.793839914799502,"capacityMarket":10.320564590279783,"networkCharges":2.2292048536198363},{"year":2050,"energyTrading":111.48090331414974,"frequencyResponse":4.772585036414741,"capacityMarket":10.320564590279783,"networkCharges":2.224864741158844},{"year":2051,"energyTrading":113.27102461419759,"frequencyResponse":4.9583503389627435,"capacityMarket":10.331303450452216,"networkCharges":2.1952267604655633},{"year":2052,"energyTrading":113.7419321219762,"frequencyResponse":4.998026819382426,"capacityMarket":10.360145567002284,"networkCharges":2.1880533716547284},{"year":2053,"energyTrading":113.25087333409142,"frequencyResponse":4.93381650030794,"capacityMarket":10.360145567002284,"networkCharges":2.245737604754864},{"year":2054,"energyTrading":114.11719798278435,"frequencyResponse":4.837909565289726,"capacityMarket":7.999251726485341,"networkCharges":2.2175003449536392},{"year":2055,"energyTrading":113.18305509756769,"frequencyResponse":5.616561819966252,"capacityMarket":1.659578357516975,"networkCharges":2.2224665372072936},{"year":2056,"energyTrading":113.7374646712523,"frequencyResponse":5.231925985311996,"capacityMarket":1.659578357516975,"networkCharges":2.191385389534317},{"year":2057,"energyTrading":112.01386700205524,"frequencyResponse":4.497470719388608,"capacityMarket":1.7037647347482028,"networkCharges":2.1787682899839034},{"year":2058,"energyTrading":111.13760996885499,"frequencyResponse":4.428835395677853,"capacityMarket":1.82242277274042,"networkCharges":2.1892100275428676},{"year":2059,"energyTrading":111.36504671794164,"frequencyResponse":4.030171129059215,"capacityMarket":1.82242277274042,"networkCharges":2.2252361444256774},{"year":2060,"energyTrading":111.47629791364102,"frequencyResponse":4.523171825453457,"capacityMarket":1.3279046287131169,"networkCharges":7.204034886108061}]}};
+
+const CATS = ["energyTrading","frequencyResponse","capacityMarket","networkCharges"];
+const CAT_LABELS = {energyTrading:"Energy trading", frequencyResponse:"Frequency response", capacityMarket:"Capacity market", networkCharges:"Network charges"};
+const COLORS = {energyTrading:"#F59E00", frequencyResponse:"#3C3C3B", capacityMarket:"#838383", networkCharges:"#FFCC00"};
+const CASE_COLORS = {"1h":"#F59E00","2h":"#3C3C3B"};
+
+function fmt(v, dp=1){ if(v===null||v===undefined||isNaN(v)) return "n/a"; return (v<0?"-":"") + "£" + Math.abs(v).toFixed(dp); }
+function fmtGBP(v){ if(v===null||v===undefined||isNaN(v)) return "n/a"; return (v<0?"-£":"£") + Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0}); }
+
+function totalForYear(y){ return CATS.reduce((s,c)=>s+y[c],0); }
+
+// ---- Cashflow stack chart with tabs ----
+let currentCase = "1h";
+const stackTabs = document.getElementById('stackTabs');
+Object.keys(CASES).forEach(k=>{
+  const b = document.createElement('button');
+  b.className = 'tabbtn' + (k===currentCase?' active':'');
+  b.textContent = CASES[k].label;
+  b.dataset.case = k;
+  b.onclick = ()=>{ currentCase = k; renderStack(); [...stackTabs.children].forEach(c=>c.classList.toggle('active', c===b)); };
+  stackTabs.appendChild(b);
+});
+
+let stackChart;
+function renderStack(){
+  const c = CASES[currentCase];
+  const years = c.yearly.map(y=>y.year);
+  const datasets = CATS.map(cat=>({
+    label: CAT_LABELS[cat],
+    data: c.yearly.map(y=>y[cat]),
+    backgroundColor: COLORS[cat] + '33',
+    borderColor: COLORS[cat],
+    borderWidth: 1.5,
+    fill: true,
+    pointRadius: 0,
+    tension: 0.15
+  }));
+  if(stackChart) stackChart.destroy();
+  stackChart = new Chart(document.getElementById('stackChart'), {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ stacked:true, ticks:{ callback:v=>'£'+v } }, x:{ ticks:{ maxTicksLimit:10 } } },
+      plugins:{ legend:{ display:false } },
+      interaction:{ mode:'index', intersect:false }
+    }
+  });
+}
+renderStack();
+
+// custom legend for stack chart categories
+const stackLegendDiv = document.createElement('div');
+stackLegendDiv.className = 'legend';
+stackLegendDiv.innerHTML = CATS.map(c=>`<span><span class="sw" style="background:${COLORS[c]}"></span>${CAT_LABELS[c]}</span>`).join('');
+document.getElementById('stackChart').closest('.card').insertBefore(stackLegendDiv, document.getElementById('stackTabs'));
+
+// ---- Cross comparison line chart ----
+new Chart(document.getElementById('lineChart'), {
+  type:'line',
+  data:{
+    labels: CASES["1h"].yearly.map(y=>y.year),
+    datasets: Object.keys(CASES).map(k=>({
+      label: CASES[k].label,
+      data: CASES[k].yearly.map(y=>totalForYear(y)),
+      borderColor: CASE_COLORS[k],
+      backgroundColor: CASE_COLORS[k],
+      pointRadius:0, borderWidth:2, tension:0.15
+    }))
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{ y:{ ticks:{ callback:v=>'£'+v } }, x:{ ticks:{ maxTicksLimit:10 } } }
+  }
+});
+
+// ---- Pies: lifetime energy trading vs rest ----
+function lifetimeMix(caseKey){
+  const c = CASES[caseKey];
+  let et = 0, rest = 0;
+  c.yearly.forEach(y=>{ et += y.energyTrading; rest += y.frequencyResponse + y.capacityMarket + y.networkCharges; });
+  return {et, rest};
+}
+["1h","2h"].forEach(k=>{
+  const mix = lifetimeMix(k);
+  new Chart(document.getElementById('pie'+k), {
+    type:'pie',
+    data:{
+      labels:['Energy trading','Everything else'],
+      datasets:[{ data:[mix.et, mix.rest], backgroundColor:['#F59E00','#838383'] }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => {
+        const total = mix.et+mix.rest;
+        return ctx.label + ': ' + Math.round(100*ctx.raw/total) + '%';
+      } } } }
+    }
+  });
+});
+
+// ---- Finance formulas ----
+function npv(rate, cashflows){
+  return cashflows.reduce((acc, cf, t)=> acc + cf/Math.pow(1+rate, t), 0);
+}
+function irr(cashflows, guess=0.1){
+  let rate = guess;
+  for(let i=0;i<100;i++){
+    const npvVal = npv(rate, cashflows);
+    const d = 1e-6;
+    const deriv = (npv(rate+d, cashflows) - npvVal)/d;
+    if(Math.abs(deriv) < 1e-9) break;
+    const next = rate - npvVal/deriv;
+    if(Math.abs(next-rate) < 1e-7) return next;
+    rate = next;
+  }
+  if(!isFinite(rate) || rate < -0.99 || rate > 5){
+    let lo=-0.5, hi=2;
+    for(let i=0;i<200;i++){
+      const mid=(lo+hi)/2;
+      if(npv(lo,cashflows)*npv(mid,cashflows) <= 0) hi=mid; else lo=mid;
+    }
+    return (lo+hi)/2;
+  }
+  return rate;
+}
+function paybackYears(cashflows){
+  let cumulative = cashflows[0];
+  if(cumulative >= 0) return 0;
+  for(let t=1;t<cashflows.length;t++){
+    cumulative += cashflows[t];
+    if(cumulative >= 0){
+      const prev = cumulative - cashflows[t];
+      const frac = -prev/cashflows[t];
+      return t-1+frac;
+    }
+  }
+  return null;
+}
+
+function buildCashflows(caseKey, capex, opex, life){
+  const c = CASES[caseKey];
+  const n = life && life>0 ? Math.min(life, c.yearly.length) : c.yearly.length;
+  const cfs = [ -capex ];
+  for(let i=0;i<n;i++){
+    const rev = totalForYear(c.yearly[i]);
+    cfs.push(rev - opex);
+  }
+  return cfs;
+}
+
+let waterfallCharts = {};
+function computeAndRender(){
+  const rate = parseFloat(document.getElementById('discountRate').value);
+  const life = parseFloat(document.getElementById('assetLife').value);
+  const results = {};
+
+  ["1h","2h"].forEach(k=>{
+    const capex = parseFloat(document.getElementById('capex_'+k).value);
+    const opex = parseFloat(document.getElementById('opex_'+k).value);
+    const hasCapex = !isNaN(capex) && capex > 0;
+    const opexVal = isNaN(opex) ? 0 : opex;
+    const rateVal = isNaN(rate) ? 0.08 : rate/100;
+
+    let npvVal=null, irrVal=null, paybackVal=null;
+    let etSum=0, frSum=0, cmSum=0, ncSum=0;
+
+    if(hasCapex){
+      const cfs = buildCashflows(k, capex, opexVal, life);
+      npvVal = npv(rateVal, cfs);
+      irrVal = irr(cfs);
+      paybackVal = paybackYears(cfs);
+
+      const c = CASES[k];
+      const n = life && life>0 ? Math.min(life, c.yearly.length) : c.yearly.length;
+      for(let i=0;i<n;i++){
+        etSum += c.yearly[i].energyTrading;
+        frSum += c.yearly[i].frequencyResponse;
+        cmSum += c.yearly[i].capacityMarket;
+        ncSum += c.yearly[i].networkCharges;
+      }
+    }
+    results[k] = {npvVal, irrVal, paybackVal, capex, opex: opexVal, hasCapex, etSum, frSum, cmSum, ncSum, life};
+
+    document.getElementById('npv_'+k).textContent = hasCapex ? fmtGBP(npvVal) : 'n/a';
+    document.getElementById('irr_'+k).textContent = hasCapex && irrVal!==null && isFinite(irrVal) ? (irrVal*100).toFixed(1)+'%' : 'n/a';
+    document.getElementById('payback_'+k).textContent = hasCapex && paybackVal!==null ? paybackVal.toFixed(1)+' yrs' : 'n/a';
+
+    // waterfall
+    const n = life && life>0 ? Math.min(life, CASES[k].yearly.length) : CASES[k].yearly.length;
+    const opexLifetime = hasCapex ? -(opexVal * n) : 0;
+    const steps = hasCapex ? [
+      {label:'Capex', value: -capex},
+      {label:'Fixed opex', value: opexLifetime},
+      {label:'Energy trading', value: results[k].etSum},
+      {label:'Freq. response', value: results[k].frSum},
+      {label:'Capacity mkt', value: results[k].cmSum},
+      {label:'Network chg.', value: results[k].ncSum}
+    ] : [
+      {label:'Capex', value:0},{label:'Fixed opex', value:0},{label:'Energy trading', value:0},
+      {label:'Freq. response', value:0},{label:'Capacity mkt', value:0},{label:'Network chg.', value:0}
+    ];
+    let running = 0;
+    const bases = [], bars = [], colors = [];
+    steps.forEach(s=>{
+      const start = running;
+      running += s.value;
+      bases.push(Math.min(start, running));
+      bars.push(Math.abs(s.value));
+      colors.push(s.value >= 0 ? '#F59E00' : '#838383');
+    });
+    // final NPV-ish bar (undiscounted net, for visual close-out) -- use running total as "Net"
+    const labels = steps.map(s=>s.label).concat(['Net']);
+    bases.push(0);
+    bars.push(Math.abs(running));
+    colors.push('#3C3C3B');
+
+    const ctxId = 'waterfall'+k;
+    if(waterfallCharts[k]) waterfallCharts[k].destroy();
+    waterfallCharts[k] = new Chart(document.getElementById(ctxId), {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          { label:'base', data: bases, backgroundColor:'rgba(0,0,0,0)', stack:'s' },
+          { label:'value', data: bars, backgroundColor: colors, stack:'s', borderRadius:4 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ctx.datasetIndex===1 ? fmtGBP(steps[ctx.dataIndex] ? steps[ctx.dataIndex].value : running) : '' } } },
+        scales:{ x:{ ticks:{ autoSkip:false, maxRotation:45 } }, y:{ ticks:{ callback:v=>'£'+v } } }
+      }
+    });
+  });
+
+  renderRanking(results);
+}
+
+let rankChart;
+let rankMetric = 'npv';
+function renderRanking(results){
+  const entries = Object.keys(results).map(k=>({
+    key:k, label:CASES[k].label,
+    npv: results[k].npvVal, irr: results[k].irrVal, hasCapex: results[k].hasCapex
+  }));
+  const valid = entries.filter(e=>e.hasCapex);
+  const badge = document.getElementById('rankBadge');
+  if(valid.length===0){
+    badge.textContent = 'Enter capex for at least one case to see the recommendation';
+  } else {
+    const metricKey = rankMetric;
+    const sorted = [...valid].sort((a,b)=> (b[metricKey]??-Infinity) - (a[metricKey]??-Infinity));
+    const top = sorted[0];
+    const topVal = top[metricKey];
+    const jointBest = sorted.filter(e => Math.abs((e[metricKey]-topVal)/ (topVal||1)) <= 0.01);
+    if(jointBest.length > 1){
+      badge.textContent = 'Joint best (' + rankMetric.toUpperCase() + '): ' + jointBest.map(j=>j.label).join(' & ');
+    } else {
+      const valStr = rankMetric==='npv' ? fmtGBP(topVal)+'/kW' : (topVal*100).toFixed(1)+'%';
+      badge.textContent = 'Highest ' + rankMetric.toUpperCase() + ': ' + top.label + ' — ' + valStr;
+    }
+  }
+
+  const sortedAll = [...entries].sort((a,b)=> ((b[rankMetric]??-Infinity)) - ((a[rankMetric]??-Infinity)));
+  const data = sortedAll.map(e=> e[rankMetric]===null||e[rankMetric]===undefined||!e.hasCapex ? 0 : (rankMetric==='irr' ? e[rankMetric]*100 : e[rankMetric]));
+  const labels = sortedAll.map(e=>e.label);
+  const colors = sortedAll.map((e,i)=> i===0 && e.hasCapex ? '#F59E00' : '#B1B1B0');
+
+  if(rankChart) rankChart.destroy();
+  rankChart = new Chart(document.getElementById('rankChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ ticks:{ callback: v => rankMetric==='irr' ? v+'%' : '£'+v } } }
+    }
+  });
+}
+
+document.querySelectorAll('#rankToggle .tabbtn').forEach(b=>{
+  b.onclick = ()=>{
+    rankMetric = b.dataset.metric;
+    document.querySelectorAll('#rankToggle .tabbtn').forEach(x=>x.classList.toggle('active', x===b));
+    computeAndRender();
+  };
+});
+
+['discountRate','assetLife','capex_1h','opex_1h','capex_2h','opex_2h'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', computeAndRender);
+});
+
+computeAndRender();
+</script>
+</body>
+</html>
