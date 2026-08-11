@@ -1,0 +1,31 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    name: Validate skill packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Package skills
+        run: python scripts/package_skills.py dist
+
+      - name: Test archives
+        run: |
+          for archive in dist/*.zip; do
+            python -m zipfile --test "$archive"
+          done
