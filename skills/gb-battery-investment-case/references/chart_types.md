@@ -137,6 +137,26 @@ Every input in step 5 wires to a single `computeAndRender()`-style function
 that recomputes NPV/IRR/payback/waterfall/ranking together, so nothing
 should be left stale after one field changes.
 
+**Standalone-file rules.** The artifact ships as a downloadable `.html` file
+with no host page, so it carries everything itself. A widget fragment can lean
+on claude.ai's `var(--surface-2)`-style tokens and on the "no titles inside the
+widget" rule; here those tokens resolve to nothing (black serif text on white,
+no card backgrounds, no legend swatches) and no chat message surrounds the
+charts. Concretely:
+- Open with `<!DOCTYPE html><html lang="en"><head>`, a `<meta charset="UTF-8">`
+  and a `<title>`; close with `</body></html>`.
+- Use only the `:root` tokens defined above, including the
+  `@media (prefers-color-scheme: dark)` override — every variable the file
+  references is one it defines.
+- Keep the explicit `body{font-family:...}` from the CSS block, so the document
+  renders sans-serif like Aurora's own reports.
+- Give every panel a visible `<h2>` or `.case-title` in the page — "Cashflow
+  stack by market", "NPV waterfall", and so on.
+- Give every legend real inline swatches (`<span class="sw" style="background:<hex>">`)
+  beside the label text, alongside any Chart.js legend.
+- Set the Aurora palette hexes above explicitly on every dataset, so Chart.js
+  renders the brand colours rather than its own defaults.
+
 ## Non-negotiables
 - No prose paragraphs inside the artifact — labels, numbers, legends only.
 - One y-axis per chart (per house style) — never dual-axis.
