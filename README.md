@@ -14,6 +14,7 @@ npx skills add AuroraEnergyResearch/aurora-mcp-resources
 
 Available skills:
 
+- `aurora-power-market-analysis`
 - `aus-battery-investment-case`
 - `gb-battery-investment-case`
 
